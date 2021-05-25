@@ -42,17 +42,31 @@ $endif$
 $if(date)$
   <p class="date">$date$</p>
 $endif$
-$if(rights)$
-  <div class="rights">$rights$</div>
-$endif$
 </section>
-$else$
-$if(coverpage)$
+$elseif(coverpage)$
 <div id="cover-image">
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="100%" height="100%" viewBox="0 0 $cover-image-width$ $cover-image-height$" preserveAspectRatio="xMidYMid">
 <image width="$cover-image-width$" height="$cover-image-height$" xlink:href="../media/$cover-image$" />
 </svg>
 </div>
+$elseif(copyrightpage)$
+<section epub:type="copyright-page" class="copyrightpage">
+$if(acknowledgments)$
+  <div epub:type="acknowledgments" class="acknowledgments">
+    $acknowledgments$
+  </div>
+$endif$
+$if(rights)$
+  <div class="rights">
+    $rights$
+  </div>
+$endif$
+$if(publication-info)$
+  <div class="publicationinfo">
+    $publication-info$
+  </div>
+$endif$
+</section>
 $else$
 $for(include-before)$
 $include-before$
@@ -61,7 +75,6 @@ $body$
 $for(include-after)$
 $include-after$
 $endfor$
-$endif$
 $endif$
 </body>
 </html>
