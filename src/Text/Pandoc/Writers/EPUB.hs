@@ -92,7 +92,9 @@ data EPUBMetadata = EPUBMetadata{
   , epubSource              :: Maybe Text
   , epubRelation            :: Maybe Text
   , epubCoverage            :: Maybe Text
+  , epubAcknowledgments     :: Maybe Text
   , epubRights              :: Maybe Text
+  , epubPublicationInfo     :: Maybe Text
   , epubBelongsToCollection :: Maybe Text
   , epubGroupPosition       :: Maybe Text
   , epubCoverImage          :: Maybe FilePath
@@ -355,7 +357,9 @@ metadataFromMeta opts meta = EPUBMetadata{
     , epubSource               = source
     , epubRelation             = relation
     , epubCoverage             = coverage
+    , epubAcknowledgments      = acknowledgements
     , epubRights               = rights
+    , epubPublicationInfo      = publicationInfo
     , epubBelongsToCollection  = belongsToCollection
     , epubGroupPosition        = groupPosition
     , epubCoverImage           = coverImage
@@ -384,7 +388,9 @@ metadataFromMeta opts meta = EPUBMetadata{
         source = metaValueToString <$> lookupMeta "source" meta
         relation = metaValueToString <$> lookupMeta "relation" meta
         coverage = metaValueToString <$> lookupMeta "coverage" meta
+        acknowledgements = metaValueToString <$> lookupMeta "acknowledgements" meta
         rights = metaValueToString <$> lookupMeta "rights" meta
+        publicationInfo = metaValueToString <$> lookupMeta "publication-info" meta
         belongsToCollection = metaValueToString <$> lookupMeta "belongs-to-collection" meta
         groupPosition = metaValueToString <$> lookupMeta "group-position" meta
         coverImage = T.unpack <$>
@@ -537,6 +543,24 @@ pandocToEPUB version opts doc = do
                                (Pandoc meta [])
   tpEntry <- mkEntry "text/title_page.xhtml" tpContent
 
+  -- acknowledgements/copyright page
+  let cpAnyContent = epubAcknowledgments metadata `mplus`
+                     epubRights metadata          `mplus`
+                     epubPublicationInfo metadata
+  copypgEntry <-
+        case cpAnyContent of
+             Nothing -> return []
+             Just _  -> do
+               copypgContent <- lift $ writeHtml opts'{ writerVariables =
+                                         Context (M.fromList [
+                                           ("copyrightpage", toVal' "true"),
+                                           ("body-type", toVal' "frontmatter"),
+                                           ("pagetitle", toVal $
+                                               escapeStringForXML plainTitle)])
+                                         <> cssvars True <> vars }
+                        (Pandoc meta [])
+               copypgEntry <- mkEntry "text/copyright_page.xhtml" copypgContent
+               return [copypgEntry]
 
   -- handle fonts
   let matchingGlob f = do
@@ -658,9 +682,9 @@ pandocToEPUB version opts doc = do
                              (n :: Int, fp) <- zip [1..] (map
                                (makeRelative epubSubdir . eRelativePath)
                                stylesheetEntries) ] ++
-             map chapterNode (cpgEntry ++
+             map chapterNode (cpgEntry ++ 
                                [tpEntry | writerEpubTitlePage opts] ++
-                               chapterEntries) ++
+                               copypgEntry ++ chapterEntries) ++
              (case cpicEntry of
                     []    -> []
                     (x:_) -> [add_attrs
@@ -679,8 +703,12 @@ pandocToEPUB version opts doc = do
                                          case lookupMeta "title" meta of
                                                Just _  -> "yes"
                                                Nothing -> "no")] $ ()
-                     | writerEpubTitlePage opts] ++
-                  [unode "itemref" ! [("idref", "nav")] $ ()
+                     | writerEpubTitlePage opts]
+              ++ case cpAnyContent of
+                    Nothing -> []
+                    Just _ -> [ unode "itemref" !
+                                [("idref", "copyright_page_xhtml")] $ () ]
+              ++ [unode "itemref" ! [("idref", "nav")] $ ()
                          | writerTableOfContents opts ] ++
                   map chapterRefNode chapterEntries)
           , unode "guide" $
@@ -736,8 +764,8 @@ pandocToEPUB version opts doc = do
                  [mimetypeEntry, containerEntry, appleEntry,
                   contentsEntry, tocEntry, navEntry] ++
                   [tpEntry | writerEpubTitlePage opts] ++
-                  stylesheetEntries ++ picEntries ++ cpicEntry ++
-                  cpgEntry ++ chapterEntries ++ fontEntries
+                  copypgEntry ++ stylesheetEntries ++ picEntries ++
+                  cpicEntry ++ cpgEntry ++ chapterEntries ++ fontEntries
   return $ fromArchive archive
 
 -- | Function used during conversion from pandoc to EPUB to create the cover page.
