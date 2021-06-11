@@ -67,6 +67,10 @@ $if(publication-info)$
   </div>
 $endif$
 </section>
+$elseif(dedicationpage)$
+<section epub:type="dedication" class="dedication">
+  $dedication$
+</section>
 $else$
 $for(include-before)$
 $include-before$
