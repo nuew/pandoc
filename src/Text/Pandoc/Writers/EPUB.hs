@@ -95,6 +95,7 @@ data EPUBMetadata = EPUBMetadata{
   , epubAcknowledgments     :: Maybe Text
   , epubRights              :: Maybe Text
   , epubPublicationInfo     :: Maybe Text
+  , epubDedication          :: Maybe Text
   , epubBelongsToCollection :: Maybe Text
   , epubGroupPosition       :: Maybe Text
   , epubCoverImage          :: Maybe FilePath
@@ -360,6 +361,7 @@ metadataFromMeta opts meta = EPUBMetadata{
     , epubAcknowledgments      = acknowledgements
     , epubRights               = rights
     , epubPublicationInfo      = publicationInfo
+    , epubDedication           = dedication
     , epubBelongsToCollection  = belongsToCollection
     , epubGroupPosition        = groupPosition
     , epubCoverImage           = coverImage
@@ -391,6 +393,7 @@ metadataFromMeta opts meta = EPUBMetadata{
         acknowledgements = metaValueToString <$> lookupMeta "acknowledgements" meta
         rights = metaValueToString <$> lookupMeta "rights" meta
         publicationInfo = metaValueToString <$> lookupMeta "publication-info" meta
+        dedication = metaValueToString <$> lookupMeta "dedication" meta
         belongsToCollection = metaValueToString <$> lookupMeta "belongs-to-collection" meta
         groupPosition = metaValueToString <$> lookupMeta "group-position" meta
         coverImage = T.unpack <$>
@@ -561,6 +564,21 @@ pandocToEPUB version opts doc = do
                copypgEntry <- mkEntry "text/copyright_page.xhtml" copypgContent
                return [copypgEntry]
 
+  dpEntry <-
+        case epubDedication metadata of
+            Nothing -> return []
+            Just _ -> do
+                dpContent <- lift $ writeHtml opts'{ writerVariables =
+                                      Context (M.fromList [
+                                        ("dedicationpage", toVal' "true"),
+                                        ("body-type", toVal' "frontmatter"),
+                                        ("pagetitle", toVal $
+                                            escapeStringForXML plainTitle)])
+                                      <> cssvars True <> vars }
+                        (Pandoc meta [])
+                dpEntry <- mkEntry "text/dedication_page.xhtml" dpContent
+                return [dpEntry]
+
   -- handle fonts
   let matchingGlob f = do
         xs <- lift $ P.glob f
@@ -683,7 +701,7 @@ pandocToEPUB version opts doc = do
                                stylesheetEntries) ] ++
              map chapterNode (cpgEntry ++ 
                                [tpEntry | writerEpubTitlePage opts] ++
-                               copypgEntry ++ chapterEntries) ++
+                               copypgEntry ++ dpEntry ++ chapterEntries) ++
              (case cpicEntry of
                     []    -> []
                     (x:_) -> [add_attrs
@@ -707,6 +725,10 @@ pandocToEPUB version opts doc = do
                     Nothing -> []
                     Just _ -> [ unode "itemref" !
                                 [("idref", "copyright_page_xhtml")] $ () ]
+              ++ case epubDedication metadata of
+                    Nothing -> []
+                    Just _ -> [ unode "itemref" !
+                                [("idref", "dedication_page_xhtml")] $ () ]
               ++ [unode "itemref" ! [("idref", "nav")] $ ()
                          | writerTableOfContents opts ] ++
                   map chapterRefNode chapterEntries)
@@ -763,7 +785,7 @@ pandocToEPUB version opts doc = do
                  [mimetypeEntry, containerEntry, appleEntry,
                   contentsEntry, tocEntry, navEntry] ++
                   [tpEntry | writerEpubTitlePage opts] ++
-                  copypgEntry ++ stylesheetEntries ++ picEntries ++
+                  copypgEntry ++ dpEntry ++ stylesheetEntries ++ picEntries ++
                   cpicEntry ++ cpgEntry ++ chapterEntries ++ fontEntries
   return $ fromArchive archive
 
