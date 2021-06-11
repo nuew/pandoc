@@ -352,6 +352,22 @@ $if(csl-refs)$
 \newcommand{\CSLRightInline}[1]{\parbox[t]{\linewidth - \csllabelwidth}{#1}\break}
 \newcommand{\CSLIndent}[1]{\hspace{\cslhangindent}#1}
 $endif$
+$for(header-includes)$
+$header-includes$
+$endfor$
+$if(acknowledgments)$
+\uppertitleback{$acknowledgments$}
+$endif$
+$if(rights)$
+\lowertitleback{
+$rights$
+\vspace*{1em}
+$publication-info$
+}
+$endif$
+$if(dedication)$
+\dedication{$dedication$}
+$endif$
 $if(lang)$
 \ifLuaTeX
 \usepackage[bidi=basic]{babel}
